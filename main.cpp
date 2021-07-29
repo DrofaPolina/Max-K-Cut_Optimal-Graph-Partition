@@ -19,25 +19,13 @@ vector<vector<double>> sum_edges;
 list<Move> tabu_list;
 set<int> tabu_set;
 int n, k, seconds;
-const double eps = 1e-7;
+const double eps = 1e-9;
 auto gg = clock();
 int cnt_o1 = 0;
 
 
 Move O1(vector<int>& partition) {  // v: Scv -> S_tv
     cout << (clock() - gg) / CLOCKS_PER_SEC << "\n";
-    /*cout << "---------------\n";
-    for (int i : partition) {
-        cout << i << " ";
-    }
-    cout << "\n";
-    for (int i = 0; i < k; ++i) {
-        cout << "\n";
-        for (int j = 0; j < n; ++j) {
-            cout << sum_edges[i][j] << " ";
-        }
-    }
-    cout << "---------------\n";*/
     ++cnt_o1;
     int maxv = 0, maxStv = partition[0];
     double maxgain = 0;
@@ -73,7 +61,7 @@ int dt(int v, int u, int Scv, int Stv, int Scu, int Stu) {
 }
 
 pair<Move, Move> O2(vector<int>& partition) {  // n: Scv -> S_tv
-    //cout << "o2 " << (clock() - gg) / CLOCKS_PER_SEC << "\n";
+    cout << "o2\n";
     pair<Move, Move> best_pair;
     double best_gain = 0;
     int v, u, Scv, Scu;
@@ -158,6 +146,7 @@ Move O3(vector<int>& partition, int lambda) {  // n: Scv -> S_tv
 }
 
 pair<Move, Move> O4(vector<int>& partition) {
+    cout << "o4" << "\n";
     int v = 0, u = 0, Scv = partition[v], Scu = partition[u];
     int Stv = Scv, Stu = Scu;
     Move move1 = {v, Scv, Stv}, move2 = {u, Scu, Stu};
@@ -189,7 +178,7 @@ Move O5(vector<int>& partition) {  // n: Scv -> S_tv
     cout << "o5 " << (clock() - gg) / CLOCKS_PER_SEC << "\n";
     int v = rand() % n, Stv = rand() % k;
     int cnt = 0;
-    while (Stv == partition[v] && cnt < n * k * 2) {
+    while (Stv == partition[v] && cnt < n * k) {
         v = rand() % n;
         Stv = rand() % k;
         ++cnt;
@@ -203,7 +192,6 @@ Move O5(vector<int>& partition) {  // n: Scv -> S_tv
 
 double Update_weight(double weight, Move move) { // (n: Scv -> S_tv)
     int Scv = move.Scv, Stv = move.Stv, v = move.v;
-    // return weight + gains[Stv][v];
     return weight + sum_edges[Scv][v] - sum_edges[Stv][v];
 }
 
@@ -308,12 +296,31 @@ void Update_sum_edges(Move move) {
     }
 }
 
+void CheckEquilibrium(vector<int>& I, vector<int>& I_best, double& f_I, double& f_best) {
+    Move move;
+    while (true) {
+        move = O1(I);
+        int f1 = Update_weight(f_I, move);
+        if (f1 - f_I > eps) {
+            cout << f1 << " eq update!\n";
+            I = Update_partition(I, move);
+            f_I = f1;
+            Update_sum_edges(move);
+            } else break;
+        }
+    if (f_I > f_best) {
+        f_best = f_I;
+        I_best = I;
+    }
+}
+
 int main() {
     std::fstream fin("../input.txt");
     std::ofstream fout("../output.txt");
     fin >> n >> k >> seconds;
     double p = 0.5;
     int w = 500, ksi = 1000, gamma_ = n / 10, lambda_;  // w = 500
+
     /*vector<int> params(n);
     for (int i = 0; i < n; ++i) {
         cin >> params[i];
@@ -351,62 +358,58 @@ int main() {
 
 
     gg = clock();
-    bool globalimpr = true;
-    int no_improvements = 0;
-    while (clock() - gg < CLOCKS_PER_SEC * seconds) {
-        //++cnt;
-        // 1 & 2
-        if (!globalimpr) ++no_improvements;
-        else no_improvements = 0;
-        globalimpr = false;
-        bool improvement = true;
-        while (improvement) {
-            improvement = false;
-            while (true) {
-                if (clock() - gg > CLOCKS_PER_SEC * seconds) break;
-
-                move = O1(I);
-                f1 = Update_weight(f_I, move);
-                if (f1 - f_I > eps) {
-                    I = Update_partition(I, move);
-                    f_I = f1;
-                    Update_sum_edges(move);
-                    improvement = true;
-                    globalimpr = true;
-                } else break;
-            }
-            if (clock() - gg > CLOCKS_PER_SEC * seconds) break;
+    //while (clock() - gg < CLOCKS_PER_SEC * seconds) {
+    for (int t = 0; t < 100; ++t) {
+        cout << "t = " << t << "\n";
+        int cnt = 0;
+        while (true) {
+            ++cnt;
+            //if (clock() - gg > CLOCKS_PER_SEC * seconds) break;
+            //if (cnt > n) break;
+            move = O1(I);
+            f1 = Update_weight(f_I, move);
+            if (f1 - f_I > eps) {
+                I = Update_partition(I, move);
+                f_I = f1;
+                Update_sum_edges(move);
+                cout << "f_I = " << f_I << "\n";
+                for (int i : I) {
+                    cout << i << " ";
+                }
+            } else break;
+        }
+        //if (clock() - gg > CLOCKS_PER_SEC * seconds) break;
+        cnt = 0;
+        while (true) {
+            ++cnt;
+            //if (cnt > n * (n - 1) / 2) break;
             auto x = O2(I);
             move1 = x.first;
             move2 = x.second;
             f2 = f_I + dt(move1.v, move2.v, move1.Scv, move1.Stv, move2.Scv, move2.Stv);
             if (f2 - f_I > eps) {
-
                 I = Update_partition(I, move1);
                 Update_sum_edges(move1);
                 I = Update_partition(I, move2);
                 Update_sum_edges(move2);
                 f_I = f2;
-                improvement = true;
-                globalimpr = true;
-            }
-
+            } else break;
         }
+
         f_loc = f_I;
         if (f_loc > f_best) {
             f_best = f_loc;
             I_best = I;
             cnon_impv = 0;
-            globalimpr = true;
         } else cnon_impv = cnon_impv + 1;
 
         // 3 & 4
         tabu_set.clear();
         tabu_list.clear();
-        int cdiv = 0; // Counter cdiv records number of diversified moves
+        int cdiv = 0; // cdiv records number of diversified moves
         while (cdiv < w && f_loc - f_I >= eps) {
 
-            if (clock() - gg > CLOCKS_PER_SEC * seconds) break;
+            //if (clock() - gg > CLOCKS_PER_SEC * seconds) break;
             lambda_ = GenerateLambda();
             double r = (rand() % 100) / (100 * 1.0);
             if (r < p) {
@@ -439,12 +442,14 @@ int main() {
                 if (f_I > f_best) {  // ??
                     f_best = f_I;
                     I_best = I;
-                    globalimpr = true;
                 }
             }
             cnon_impv = 0;
         }
     }
+
+    CheckEquilibrium(I, I_best, f_I, f_best);
+
     cout << f_best << "\n";
     for (int i : I_best) {
         cout << i << " ";
